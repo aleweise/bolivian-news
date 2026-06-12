@@ -1,36 +1,144 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🇧🇴 Bolivia News CMS
 
-## Getting Started
+CMS IA-first para noticias de Bolivia y el mundo. El scraping corre automáticamente cada 8 horas via Hermes cron — vos solo corregís desde el dashboard.
 
-First, run the development server:
+## Arquitectura
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+┌─────────────────────────────────────────────┐
+│  Vercel (Next.js - Free Tier)               │
+│                                             │
+│  🌐 Public Site  ← bolivia-news.vercel.app  │
+│  🔒 Admin Dashboard ← /admin                │
+│  ⚙️  API Routes                              │
+└────────────────────┬────────────────────────┘
+                     │
+              ┌──────▼──────┐
+              │  Supabase   │
+              │  (PostgreSQL)│
+              └─────────────┘
+                     ▲
+                     │
+         ┌───────────┴────────────┐
+         │  TU PC (Hermes)        │
+         │  Cron: scrape + IA     │
+         │  → sube directo a DB   │
+         └────────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend:** Next.js 15 (App Router), TypeScript, TailwindCSS v4
+- **Base de datos:** Supabase (PostgreSQL)
+- **Scraping:** Scripts TypeScript en tu PC, MiniMax para análisis IA
+- **Deploy:** Vercel (free tier)
+- **Auth:** Contraseña simple via cookie (admin)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Workflow
 
-## Learn More
+1. **Hermes** scrapea noticias cada 8 horas (Reuters, BBC, AP, Al Jazeera)
+2. **MiniMax** analiza y clasifica: título, resumen, categoría, tags
+3. Se **guardan directo en Supabase** y se publican automáticamente
+4. **Vos corregís** desde `/admin` — editás título, contenido, categoría, etc.
+5. Marcás como "revisado" y publicás
 
-To learn more about Next.js, take a look at the following resources:
+## Primeros Pasos
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 1. Configurar Supabase
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Creá un proyecto en [supabase.com](https://supabase.com)
+2. Ejecutá el schema en SQL Editor:
 
-## Deploy on Vercel
+```bash
+# En Supabase Dashboard → SQL Editor → pegar contenido de:
+supabase-schema.sql
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. Copiá las credenciales (URL, anon key, service role key)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 2. Configurar Vercel
+
+```bash
+cd bolivian-news
+vercel login
+vercel deploy
+```
+
+Configurá las variables de entorno en Vercel:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+ADMIN_PASSWORD=tu-contraseña-secreta
+SCRAPE_WEBHOOK_SECRET=scrape-secret
+```
+
+### 3. Configurar tu PC (scraping)
+
+```bash
+cd bolivian-news
+cp .env.local.example .env.local
+# Editar .env.local con tus credenciales
+```
+
+### 4. Correr scraping manualmente
+
+```bash
+cd bolivian-news
+pnpm scrape
+```
+
+### 5. Configurar cron (cada 8 horas)
+
+```bash
+hermes cron create \
+  --name "Bolivia News Scraper" \
+  --schedule "0 */8 * * *" \
+  --prompt "Run: cd bolivian-news && pnpm scrape" \
+  --skills "terminal"
+```
+
+## Dashboard Admin
+
+- **URL:** `/admin`
+- **Login:** Contraseña configurada en `ADMIN_PASSWORD`
+- **Funciones:**
+  - Ver todos los artículos (filtrados por categoría, estado)
+  - Editar título, contenido, categoría, tags
+  - Marcar como revisado/publicado/oculto
+  - Eliminar artículos
+  - Crear artículos manualmente
+
+## Rutas
+
+| Ruta | Descripción |
+|-----|-------------|
+| `/` | Homepage — últimas noticias |
+| `/article/[id]` | Artículo completo |
+| `/category/[slug]` | Noticias por categoría |
+| `/search` | Búsqueda |
+| `/admin` | Dashboard admin (protegido) |
+| `/admin/articles` | Lista de artículos |
+| `/admin/articles/[id]` | Editor de artículo |
+| `/admin/settings` | Configuración |
+
+## Fuentes de Noticias
+
+- Reuters (reuters.com)
+- BBC Mundo (bbc.com/mundo)
+- AP News (apnews.com)
+- Al Jazeera (aljazeera.com)
+
+## Scripts
+
+```bash
+pnpm scrape          # Ejecutar scraping manualmente
+pnpm dev             # Desarrollo local
+pnpm build           # Build de producción
+pnpm lint            # Linting
+```
+
+## License
+
+MIT
